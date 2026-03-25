@@ -1,0 +1,4 @@
+/*.jsonl
+  Content-Type: application/x-ndjson
+  Cache-Control: max-age=60, stale-while-revalidate=300
+  Access-Control-Allow-Origin: *
