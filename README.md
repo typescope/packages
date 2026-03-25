@@ -145,3 +145,23 @@ for human maintenance; the served layout is flat for efficient resolution.
 The resolver uses the `deps` field to traverse the dependency graph with JSONL
 fetches only, then downloads artifacts for selected versions. If `deps` is absent,
 it falls back to reading `meta.toml` from the downloaded artifact.
+
+## Deployment
+
+The flat registry is built and served via Cloudflare Pages.
+
+**Build command**: `python3 build.py`
+**Output directory**: `dist`
+
+`build.py` flattens `releases/<shard>/<namespace>/<package>.jsonl` into
+`dist/<package>.jsonl`. It fails if two packages under different namespaces
+share the same name.
+
+To build locally:
+
+```sh
+python3 build.py
+```
+
+The `_headers` file configures Cloudflare to serve `.jsonl` files with the
+correct MIME type (`application/x-ndjson`) and a short cache TTL (60s).
