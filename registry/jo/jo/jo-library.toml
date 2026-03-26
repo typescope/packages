@@ -1,0 +1,10 @@
+name       = "jo-library"
+namespace  = "jo"
+repo       = "github.com/typescope/jo"
+registered = "2026-03-26"
+publishers = ["liufengyun", "everdance"]
+
+[owner]
+name  = "TypeScope"
+email = "fengyun.liu@typescope.ai"
+url   = "https://typescope.ai"
