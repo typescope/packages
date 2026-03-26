@@ -100,11 +100,15 @@ def validate_toml(path: Path, pr_author: str, base_ref: str) -> None:
 
         existing_owner = existing[0].get("owner", {})
         new_owner = data.get("owner", {})
-        if new_owner.get("name") != existing_owner.get("name") or \
-           new_owner.get("email") != existing_owner.get("email"):
+        if new_owner.get("name") != existing_owner.get("name"):
             fail(
-                f"{path}: owner must match the existing namespace owner "
-                f"(name='{existing_owner.get('name')}', email='{existing_owner.get('email')}')"
+                f"{path}: owner.name must match the existing owner of namespace '{namespace}': "
+                f"expected '{existing_owner.get('name')}', got '{new_owner.get('name')}'"
+            )
+        if new_owner.get("email") != existing_owner.get("email"):
+            fail(
+                f"{path}: owner.email must match the existing owner of namespace '{namespace}': "
+                f"expected '{existing_owner.get('email')}', got '{new_owner.get('email')}'"
             )
 
     print(f"  ok: {path}")
