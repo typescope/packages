@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>404 – Jo Package Registry</title>
+  <style>
+    body { font-family: monospace; max-width: 720px; margin: 60px auto; padding: 0 20px; color: #222; }
+    h1 { font-size: 1.2em; }
+    h2 { font-size: 1em; margin-top: 2em; color: #555; }
+    pre { background: #f5f5f5; padding: 12px; overflow-x: auto; }
+    a { color: #0066cc; }
+  </style>
+</head>
+<body>
+
+<h1>404 – Package not found</h1>
+
+<p>The requested package does not exist in the Jo registry.</p>
+
+<p>Each registered package exposes two files:</p>
+
+<pre>https://pkg.jo-lang.org/&lt;package&gt;.toml   ← registration metadata
+https://pkg.jo-lang.org/&lt;package&gt;.jsonl  ← release index</pre>
+
+<h2>Registration metadata (<code>.toml</code>)</h2>
+<pre>name       = "greeter"
+namespace  = "acme"
+repo       = "github.com/alice/greeter"
+registered = "2026-01-01"
+publishers = ["alice"]
+
+[owner]
+name  = "Alice Smith"
+email = "alice@example.com"</pre>
+
+<h2>Release index (<code>.jsonl</code>)</h2>
+<p>One JSON line per published version, append-only:</p>
+<pre>{"version":"1.0.0","url":"https://...","sha512":"6f0d...","deps":{}}
+{"version":"1.1.0","url":"https://...","sha512":"7a21...","deps":{"math":"^1.0"}}</pre>
+
+<p>To publish a package, see the
+<a href="https://github.com/typescope/packages">registry repository</a>.</p>
+
+</body>
+</html>

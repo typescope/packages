@@ -33,4 +33,6 @@ for toml in sorted(Path("registry").rglob("*.toml")):
     print(f"  {toml} -> dist/{toml.name}")
     toml_count += 1
 
+shutil.copy("404.html", dist / "404.html")
+
 print(f"\nBuilt {jsonl_count} release index(es) and {toml_count} registration file(s) into dist/")
