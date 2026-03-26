@@ -2,3 +2,8 @@
   Content-Type: application/x-ndjson
   Cache-Control: max-age=60, stale-while-revalidate=300
   Access-Control-Allow-Origin: *
+
+/*.toml
+  Content-Type: application/toml
+  Cache-Control: max-age=300, stale-while-revalidate=3600
+  Access-Control-Allow-Origin: *

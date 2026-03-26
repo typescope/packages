@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Build the flat registry for Cloudflare Pages.
 
-Flattens releases/<shard>/<namespace>/<package>.jsonl
-        → dist/<package>.jsonl
+Flattens releases/<shard>/<namespace>/<package>.jsonl -> dist/<package>.jsonl
+Flattens registry/<shard>/<namespace>/<package>.toml  -> dist/<package>.toml
 """
 
 import shutil
@@ -13,7 +13,7 @@ if dist.exists():
     shutil.rmtree(dist)
 dist.mkdir()
 
-copied = 0
+jsonl_count = 0
 for jsonl in sorted(Path("releases").rglob("*.jsonl")):
     dest = dist / jsonl.name
     if dest.exists():
@@ -21,6 +21,16 @@ for jsonl in sorted(Path("releases").rglob("*.jsonl")):
         raise SystemExit(1)
     shutil.copy(jsonl, dest)
     print(f"  {jsonl} -> dist/{jsonl.name}")
-    copied += 1
+    jsonl_count += 1
 
-print(f"\nBuilt {copied} package(s) into dist/")
+toml_count = 0
+for toml in sorted(Path("registry").rglob("*.toml")):
+    dest = dist / toml.name
+    if dest.exists():
+        print(f"CONFLICT: {toml.name} appears more than once under registry/")
+        raise SystemExit(1)
+    shutil.copy(toml, dest)
+    print(f"  {toml} -> dist/{toml.name}")
+    toml_count += 1
+
+print(f"\nBuilt {jsonl_count} release index(es) and {toml_count} registration file(s) into dist/")
