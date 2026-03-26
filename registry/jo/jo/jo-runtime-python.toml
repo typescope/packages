@@ -1,0 +1,10 @@
+name       = "jo-runtime-python"
+namespace  = "jo"
+repo       = "github.com/typescope/jo"
+registered = "2026-03-26"
+publishers = ["liufengyun", "everdance"]
+
+[owner]
+name  = "Wrong Owner"
+email = "wrong@example.com"
+url   = "https://typescope.ai"
