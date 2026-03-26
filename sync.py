@@ -23,7 +23,7 @@ import json
 import os
 import sys
 import tempfile
-import tomllib
+import tomli as tomllib
 import urllib.request
 import urllib.error
 import zipfile
