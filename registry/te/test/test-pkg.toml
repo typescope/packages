@@ -1,0 +1,9 @@
+name       = "wrong-name"
+namespace  = "test"
+repo       = "github.com/example/test"
+registered = "2026-03-26"
+publishers = ["liufengyun"]
+
+[owner]
+name  = "Test"
+email = "test@example.com"
