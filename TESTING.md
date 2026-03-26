@@ -4,6 +4,20 @@ This document describes the integration test scenarios for the registry CI
 validation workflows. Each scenario can be re-run by opening a PR with the
 described content.
 
+## Release sync (`sync.py`)
+
+The primary path for publishing releases. Run periodically from an up-to-date
+clone of this repository:
+
+```
+python3 sync.py [--dry-run]
+```
+
+The script scans every registration file under `registry/`, queries the
+configured publication source (GitHub Releases), downloads new `.joy` artifacts,
+verifies sha512, and appends canonical entries to `releases/.../pkg.jsonl`.
+Updated release files are then committed and pushed to main.
+
 ## Registration validation (`validate-registration.yml`)
 
 These tests exercise `.github/scripts/validate_registration.py`.
@@ -32,7 +46,11 @@ These tests exercise `.github/scripts/validate_registration.py`.
 | R8 | PR touches files outside `registry/` | CI fails: `registration PR must only touch files under registry/` |
 | R9 | `publishers` is an empty list | CI fails: `publishers must be a non-empty list of GitHub IDs` |
 
-## Release validation (`validate-release.yml`)
+## Manual release update (`validate-release.yml`)
+
+A fallback path for publishing a release manually, without waiting for the
+sync script. Open a PR that appends exactly one line to a release JSONL file.
+CI validates the line and auto-merges on success.
 
 These tests exercise `.github/scripts/validate_release.py`.
 
