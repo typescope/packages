@@ -49,12 +49,14 @@ def parse_args() -> bool:
 # HTTP helpers
 # ---------------------------------------------------------------------------
 
+def _auth_headers() -> dict:
+    token = os.environ.get("GITHUB_TOKEN")
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
 def github_get(url: str) -> dict | list:
     """Fetch a GitHub API URL and return parsed JSON."""
-    token = os.environ.get("GITHUB_TOKEN")
-    headers = {"Accept": "application/vnd.github+json"}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    headers = {"Accept": "application/vnd.github+json", **_auth_headers()}
     req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req) as resp:
         return json.loads(resp.read())
@@ -62,11 +64,7 @@ def github_get(url: str) -> dict | list:
 
 def download_file(url: str, dest: Path) -> None:
     """Download url to dest."""
-    token = os.environ.get("GITHUB_TOKEN")
-    headers = {}
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(url, headers=headers)
+    req = urllib.request.Request(url, headers=_auth_headers())
     with urllib.request.urlopen(req) as resp, open(dest, "wb") as f:
         while chunk := resp.read(65536):
             f.write(chunk)
@@ -87,6 +85,23 @@ def sha512_hex(path: Path) -> str:
 # ---------------------------------------------------------------------------
 # Artifact helpers
 # ---------------------------------------------------------------------------
+
+def download_verified(url: str, dest: Path, sha512_url: str) -> str:
+    """Download url to dest and verify against the publisher-provided sha512 file.
+
+    Returns the sha512 hex digest on success, raises RuntimeError otherwise.
+    """
+    req = urllib.request.Request(sha512_url, headers=_auth_headers())
+    with urllib.request.urlopen(req) as resp:
+        expected_sha512 = resp.read().decode().split()[0].strip()
+
+    download_file(url, dest)
+    actual = sha512_hex(dest)
+
+    if actual != expected_sha512:
+        raise RuntimeError(f"sha512 mismatch: expected {expected_sha512}, got {actual}")
+
+    return actual
 
 def read_deps_from_artifact(path: Path) -> dict[str, str]:
     """Extract dependencies from meta.toml inside a .joy archive."""
@@ -144,6 +159,9 @@ def scan_github(name: str, repo: str, existing: dict[str, dict], jsonl_path: Pat
                 dry_run: bool) -> list[str]:
     """Scan GitHub Releases for new versions of package `name` in `repo`.
 
+    Version is derived from the .joy asset name (<name>-v<version>.joy);
+    the release tag is ignored.
+
     Returns a list of error strings (empty on success).
     """
     errors: list[str] = []
@@ -158,86 +176,89 @@ def scan_github(name: str, repo: str, existing: dict[str, dict], jsonl_path: Pat
     if not isinstance(releases, list):
         return [f"unexpected GitHub API response for {repo}"]
 
+    joy_prefix = f"{name}-v"
+    joy_suffix = ".joy"
     new_count = 0
 
     for rel in releases:
-        tag: str = rel.get("tag_name", "")
-
-        # Tag must be exactly v<version>
-        if not tag.startswith("v"):
-            continue
-        version = tag[1:]
-
-        # Skip pre-releases and draft releases
-        if rel.get("prerelease") or rel.get("draft"):
+        # Skip draft releases
+        if rel.get("draft"):
             continue
 
-        # Skip already-recorded versions
-        if version in existing:
-            continue
-
-        # Locate required .joy asset
+        # Find all .joy assets for this package in this release
         assets: list[dict] = rel.get("assets", [])
-        joy_name = f"{name}-v{version}.joy"
-        src_name = f"{name}-v{version}-sources.zip"
+        joy_assets = [
+            a for a in assets
+            if a["name"].startswith(joy_prefix) and a["name"].endswith(joy_suffix)
+        ]
 
-        joy_asset = next((a for a in assets if a["name"] == joy_name), None)
-        src_asset = next((a for a in assets if a["name"] == src_name), None)
+        for joy_asset in joy_assets:
+            joy_name = joy_asset["name"]
+            version = joy_name[len(joy_prefix):-len(joy_suffix)]
 
-        if joy_asset is None:
-            errors.append(f"  [skip] v{version}: missing required asset '{joy_name}'")
-            continue
-
-        joy_url = joy_asset["browser_download_url"]
-        src_url = src_asset["browser_download_url"] if src_asset else None
-
-        print(f"  [new]  v{version}")
-
-        if dry_run:
-            new_count += 1
-            continue
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp = Path(tmpdir)
-
-            # Download and verify .joy
-            joy_path = tmp / joy_name
-            try:
-                print(f"         downloading {joy_name} ...")
-                download_file(joy_url, joy_path)
-            except Exception as e:
-                errors.append(f"  [error] v{version}: failed to download {joy_name}: {e}")
+            # Skip already-recorded versions
+            if version in existing:
                 continue
 
-            joy_sha512 = sha512_hex(joy_path)
+            src_name = f"{name}-v{version}-sources.zip"
+            src_asset = next((a for a in assets if a["name"] == src_name), None)
 
-            # Build release record
-            record: dict = {
-                "version": version,
-                "url": joy_url,
-                "sha512": joy_sha512,
-            }
+            joy_sha512_asset = next((a for a in assets if a["name"] == joy_name + ".sha512"), None)
+            src_sha512_asset = next((a for a in assets if src_asset and a["name"] == src_name + ".sha512"), None)
 
-            # Extract deps from artifact
-            deps = read_deps_from_artifact(joy_path)
-            if deps:
-                record["deps"] = deps
+            if joy_sha512_asset is None:
+                errors.append(f"v{version}: missing required asset '{joy_name}.sha512'")
+                continue
 
-            # Optional sources archive
-            if src_url:
-                src_path = tmp / src_name
+            joy_url = joy_asset["browser_download_url"]
+            joy_sha512_url = joy_sha512_asset["browser_download_url"]
+            src_url = src_asset["browser_download_url"] if src_asset else None
+            src_sha512_url = src_sha512_asset["browser_download_url"] if src_sha512_asset else None
+
+            print(f"  [new]  v{version}")
+
+            if dry_run:
+                new_count += 1
+                continue
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                tmp = Path(tmpdir)
+
+                # Download and verify .joy against its .sha512
+                joy_path = tmp / joy_name
                 try:
-                    print(f"         downloading {src_name} ...")
-                    download_file(src_url, src_path)
-                    record["source_url"] = src_url
-                    record["source_sha512"] = sha512_hex(src_path)
+                    print(f"         downloading {joy_name} ...")
+                    joy_sha512 = download_verified(joy_url, joy_path, joy_sha512_url)
                 except Exception as e:
-                    # Sources are optional; log and continue
-                    print(f"  [warn] v{version}: could not download sources: {e}", file=sys.stderr)
+                    errors.append(f"v{version}: {e}")
+                    continue
 
-            append_release(jsonl_path, record)
-            new_count += 1
-            print(f"         appended to {jsonl_path}")
+                # Build release record
+                record: dict = {
+                    "version": version,
+                    "url": joy_url,
+                    "sha512": joy_sha512,
+                }
+
+                # Extract deps from artifact
+                deps = read_deps_from_artifact(joy_path)
+                if deps:
+                    record["deps"] = deps
+
+                # Optional sources archive
+                if src_url and src_sha512_url:
+                    src_path = tmp / src_name
+                    try:
+                        print(f"         downloading {src_name} ...")
+                        src_sha512 = download_verified(src_url, src_path, src_sha512_url)
+                        record["source_url"] = src_url
+                        record["source_sha512"] = src_sha512
+                    except Exception as e:
+                        print(f"  [warn] v{version}: could not verify sources: {e}", file=sys.stderr)
+
+                append_release(jsonl_path, record)
+                new_count += 1
+                print(f"         appended to {jsonl_path}")
 
     if new_count == 0 and not errors:
         print("  up-to-date")
