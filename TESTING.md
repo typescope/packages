@@ -65,7 +65,22 @@ These tests exercise `.github/scripts/validate_release.py`.
 
 | Test | Status | PR / Notes |
 |---|---|---|
+| R1 | PASS (CI accepted) | #1 — `jo-runtime-ruby` registered |
+| R2 | PASS (CI accepted) | main — `jo-runtime-ruby` follows `jo-library` under `jo` namespace |
 | R3 | PASS (CI rejected) | #3 — wrong `owner.name` |
 | R4 | PASS (CI rejected) | #4 — wrong `owner.email` |
-
-Add a row here each time a scenario is verified.
+| R5 | — | Requires a second GitHub account; not yet tested |
+| R6 | PASS (CI rejected) | #5 — name `wrong-name` did not match filename `test-pkg` |
+| R7 | PASS (CI rejected) | #6 — missing required field `repo` |
+| R8 | PASS (CI rejected) | #7 — PR touched `stray-file.txt` outside `registry/` |
+| R9 | PASS (CI rejected) | #8 — `publishers = []` |
+| P1 | — | Requires a real artifact; not yet tested |
+| P2 | — | Requires a second GitHub account; not yet tested |
+| P3 | PASS (CI rejected) | #9 — no `registry/fa/fake/fake-pkg.toml` found |
+| P4 | — | Requires a real artifact; not yet tested |
+| P5 | — | Requires a real artifact; not yet tested |
+| P6 | — | Requires an existing release to duplicate; not yet tested |
+| P7 | PASS (CI rejected) | #10 — two lines added instead of one |
+| P8 | PASS (CI rejected) | #11 — two release files touched |
+| P9 | PASS (CI rejected) | #12 — `this is not json` is not valid JSON |
+| P10 | PASS (CI rejected) | #13 — missing required field `sha512` |
