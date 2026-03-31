@@ -5,12 +5,14 @@ Checks:
   1. PR only touches files under releases/
   2. PR touches exactly one release file
   3. A registration exists for the package
-  4. PR appends exactly one line to the release file
-  5. The appended line is valid JSON with all required fields
-  6. The version format is valid (MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier)
-  7. The version is not already present in the release file
-  8. The artifact sha512 matches the claimed value
-  9. The deps field (if present) matches meta.toml from the artifact
+  4. If publish.github is set and GITHUB_ACTOR is known, the actor must be
+     the repo owner or a public member of the repo's owning org
+  5. PR appends exactly one line to the release file
+  6. The appended line is valid JSON with all required fields
+  7. The version format is valid (MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier)
+  8. The version is not already present in the release file
+  9. The artifact sha512 matches the claimed value
+  10. The deps field (if present) matches meta.toml from the artifact
 """
 
 import hashlib
@@ -21,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -84,8 +87,51 @@ def read_deps_from_artifact(artifact_path: str) -> dict:
     return meta.get("dependencies", {})
 
 
+class _NoRedirect(urllib.request.BaseHandler):
+    """Prevent urllib from following redirects so we can inspect the status code."""
+    def http_error_301(self, req, fp, code, msg, hdrs): raise urllib.error.HTTPError(req.full_url, code, msg, hdrs, fp)
+    def http_error_302(self, req, fp, code, msg, hdrs): raise urllib.error.HTTPError(req.full_url, code, msg, hdrs, fp)
+    def http_error_303(self, req, fp, code, msg, hdrs): raise urllib.error.HTTPError(req.full_url, code, msg, hdrs, fp)
+    def http_error_307(self, req, fp, code, msg, hdrs): raise urllib.error.HTTPError(req.full_url, code, msg, hdrs, fp)
+
+
+def _github_headers() -> dict:
+    token = os.environ.get("GITHUB_TOKEN")
+    headers = {"Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def check_github_authorization(registry_path: Path, github_repo: str, actor: str) -> None:
+    """Verify actor is the repo owner or a public member of the owning org."""
+    owner = github_repo.split("/")[0]
+
+    if actor == owner:
+        return
+
+    url = f"https://api.github.com/orgs/{owner}/members/{actor}"
+    req = urllib.request.Request(url, headers=_github_headers())
+    opener = urllib.request.build_opener(_NoRedirect())
+    try:
+        with opener.open(req) as resp:
+            if resp.status == 204:
+                return
+    except urllib.error.HTTPError as e:
+        if e.code in (302, 404):
+            fail(
+                f"'{actor}' is not authorized to publish for {registry_path}.\n"
+                f"  The publish source is '{github_repo}'.\n"
+                f"  The PR author must be '{owner}' or a public member of that org."
+            )
+        print(f"  note: could not verify GitHub authorization for {github_repo} (HTTP {e.code}), human review required")
+    except Exception as e:
+        print(f"  note: could not verify GitHub authorization for {github_repo} ({e}), human review required")
+
+
 def main() -> None:
     base_ref = os.environ.get("BASE_REF", "origin/main")
+    actor = os.environ.get("GITHUB_ACTOR")
 
     # 1. Check changed files
     changed = changed_files(base_ref)
@@ -109,13 +155,24 @@ def main() -> None:
     if not registry_path.exists():
         fail(f"no registration metadata found at {registry_path}")
 
-    # 3. Check exactly one line added
+    # 3. Check authorization
+    try:
+        with open(registry_path, "rb") as f:
+            reg = tomllib.load(f)
+    except Exception as e:
+        fail(f"failed to parse {registry_path}: {e}")
+
+    github_repo = reg.get("publish", {}).get("github")
+    if github_repo and actor:
+        check_github_authorization(registry_path, github_repo, actor)
+
+    # 4. Check exactly one line added
     added = added_lines(release_path, base_ref)
     if len(added) != 1:
         fail(f"PR must add exactly one line to the release file, found {len(added)}")
     new_line = added[0]
 
-    # 4. Parse and validate required fields
+    # 5. Parse and validate required fields
     try:
         record = json.loads(new_line)
     except json.JSONDecodeError as e:
@@ -128,11 +185,11 @@ def main() -> None:
     url = record["url"]
     claimed_sha512 = record["sha512"]
 
-    # 5. Validate version format
+    # 6. Validate version format
     if not VERSION_RE.match(version):
         fail(f"invalid version format '{version}': must be MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier")
 
-    # 6. Check version not already present
+    # 7. Check version not already present
     for line in base_file_lines(release_path, base_ref):
         line = line.strip()
         if not line:
@@ -144,7 +201,7 @@ def main() -> None:
         if existing.get("version") == version:
             fail(f"version '{version}' is already present in {release_path}")
 
-    # 7. Download artifact and verify sha512
+    # 8. Download artifact and verify sha512
     with tempfile.TemporaryDirectory() as tmpdir:
         artifact_path = os.path.join(tmpdir, f"{package_name}-v{version}.joy")
         print(f"Downloading {url} ...")
@@ -154,7 +211,7 @@ def main() -> None:
         if actual_sha512 != claimed_sha512:
             fail(f"sha512 mismatch:\n  claimed: {claimed_sha512}\n  actual:  {actual_sha512}")
 
-        # 9. Verify deps if present
+        # 10. Verify deps if present
         if "deps" in record:
             actual_deps = read_deps_from_artifact(artifact_path)
             if record["deps"] != actual_deps:

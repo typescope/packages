@@ -35,16 +35,25 @@ These tests exercise `.github/scripts/validate_registration.py`.
 |---|---|---|
 | R3 | Register under a claimed namespace with wrong `owner.name` | CI fails: `owner.name must match the existing owner of namespace '...'` |
 | R4 | Register under a claimed namespace with wrong `owner.email` | CI fails: `owner.email must match the existing owner of namespace '...'` |
-| R5 | Register under a claimed namespace, PR author not in publishers | CI fails: `'<author>' is not in its publishers list` |
+
+### Authorization
+
+| # | Description | Expected result |
+|---|---|---|
+| R5 | PR author is not the owner of `publish.github` repo (personal repo) | CI fails: `'<author>' is not authorized to modify this registration` |
+| R6 | PR author is not a public member of the owning org (org repo) | CI fails: `'<author>' is not authorized to modify this registration` |
+| R7 | Registration has no `publish.github` source | CI passes with note: `human review required for authorization` |
 
 ### Structural checks
 
 | # | Description | Expected result |
 |---|---|---|
-| R6 | Registration file where `name` does not match filename | CI fails: `name '...' does not match filename '...'` |
-| R7 | Registration file missing a required field (e.g. `repo`) | CI fails: `missing required field '...'` |
-| R8 | PR touches files outside `registry/` | CI fails: `registration PR must only touch files under registry/` |
-| R9 | `publishers` is an empty list | CI fails: `publishers must be a non-empty list of GitHub IDs` |
+| R8 | Registration file where `name` does not match filename | CI fails: `name '...' does not match filename '...'` |
+| R9 | Registration file missing a required field (e.g. `repo`) | CI fails: `missing required field '...'` |
+| R10 | PR touches files outside `registry/` | CI fails: `registration PR must only touch files under registry/` |
+| R11 | PR changes `name` of an existing registration | CI fails: `'name' is immutable and cannot be changed` |
+| R12 | PR changes `namespace` of an existing registration | CI fails: `'namespace' is immutable and cannot be changed` |
+| R13 | PR changes `registered` of an existing registration | CI fails: `'registered' is immutable and cannot be changed` |
 
 ## Manual release update (`validate-release.yml`)
 
@@ -64,7 +73,7 @@ These tests exercise `.github/scripts/validate_release.py`.
 
 | # | Description | Expected result |
 |---|---|---|
-| P2 | PR author not in `publishers` for the package | CI fails: `'<author>' is not authorized to publish` |
+| P2 | PR author is not the owner of `publish.github` repo (personal repo) | CI fails: `'<author>' is not authorized to publish` |
 | P3 | No registration metadata found for the package | CI fails: `no registration metadata found` |
 
 ### Release line integrity
@@ -89,10 +98,11 @@ These tests exercise `.github/scripts/validate_release.py`.
 | R3 | PASS (CI rejected) | #3 — wrong `owner.name` |
 | R4 | PASS (CI rejected) | #4 — wrong `owner.email` |
 | R5 | — | Requires a second GitHub account; not yet tested |
-| R6 | PASS (CI rejected) | #5 — name `wrong-name` did not match filename `test-pkg` |
-| R7 | PASS (CI rejected) | #6 — missing required field `repo` |
-| R8 | PASS (CI rejected) | #7 — PR touched `stray-file.txt` outside `registry/` |
-| R9 | PASS (CI rejected) | #8 — `publishers = []` |
+| R6 | — | Requires an org repo setup; not yet tested |
+| R7 | — | Not yet tested |
+| R8 | PASS (CI rejected) | #5 — name `wrong-name` did not match filename `test-pkg` |
+| R9 | PASS (CI rejected) | #6 — missing required field `repo` |
+| R10 | PASS (CI rejected) | #7 — PR touched `stray-file.txt` outside `registry/` |
 | P1 | — | Requires a real artifact; not yet tested |
 | P2 | — | Requires a second GitHub account; not yet tested |
 | P3 | PASS (CI rejected) | #9 — no `registry/fa/fake/fake-pkg.toml` found |

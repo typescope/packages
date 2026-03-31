@@ -59,17 +59,30 @@ github = "alice/greeter"
 
 Fields:
 
-| Field       | Description |
-|---|---|
-| `name`      | Package name (must match filename) |
-| `namespace` | Dot-separated namespace (top-level component determines shard) |
-| `repo`      | Source repository |
-| `registered`| Registration date |
-| `[owner]`   | Primary contact for the package |
-| `[publish]` | Publication source — key identifies the source type |
+| Field       | Mutable? | Description |
+|---|---|---|
+| `name`      | No  | Package name (must match filename) |
+| `namespace` | No  | Dot-separated namespace (top-level component determines shard) |
+| `registered`| No  | Registration date — set once at registration |
+| `repo`      | Yes | Source repository link |
+| `[owner]`   | Yes | Primary contact for the package |
+| `[publish]` | Yes | Publication source — key identifies the source type |
 
 To register a new package, open a PR adding the `.toml` file. Human review is
 required for registration.
+
+## Authorization for registry changes
+
+CI automatically checks that the PR author is authorized to make the change.
+For GitHub-hosted packages (`publish.github = "owner/repo"`), the PR author
+must be `owner` (personal repo) or a public member of `owner` (org repo),
+verified against the GitHub API with no extra credentials required.
+
+If the GitHub API is unreachable (rate limit, server error), CI prints a note
+and defers to human review rather than blocking the PR.
+
+Namespace ownership is always enforced: all registrations under a namespace
+must share the same `owner.name` and `owner.email`.
 
 ## Publishing a new version
 

@@ -7,12 +7,18 @@ Checks:
   3. The name field matches the filename
   4. If the namespace is already used by another registration, the new
      registration's owner.name and owner.email must match the existing owner
+  5. Immutable fields (name, namespace, registered) are not changed in updates
+  6. If publish.github is set and GITHUB_ACTOR is known, the actor must be
+     the repo owner or a public member of the repo's owning org.
+     Registrations without a GitHub publish source require human review.
 """
 
 import os
 import subprocess
 import sys
 import tomllib
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 
@@ -32,10 +38,25 @@ def changed_files(base_ref: str) -> list[str]:
 
 REQUIRED_FIELDS = ("name", "namespace", "repo", "registered")
 REQUIRED_OWNER_FIELDS = ("name", "email")
+IMMUTABLE_FIELDS = ("name", "namespace", "registered")
 
 
 def namespace_shard(namespace: str) -> str:
     return namespace[:2]
+
+
+def base_registration(path: Path, base_ref: str) -> dict | None:
+    """Return the parsed base-branch content of path, or None if it is a new file."""
+    result = subprocess.run(
+        ["git", "show", f"{base_ref}:{path}"],
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        return tomllib.loads(result.stdout.decode())
+    except Exception:
+        return None
 
 
 def existing_registrations_for_namespace(namespace: str, base_ref: str) -> list[dict]:
@@ -62,7 +83,56 @@ def existing_registrations_for_namespace(namespace: str, base_ref: str) -> list[
     return registrations
 
 
-def validate_toml(path: Path, base_ref: str) -> None:
+class _NoRedirect(urllib.request.BaseHandler):
+    """Prevent urllib from following redirects so we can inspect the status code."""
+    def http_error_301(self, req, fp, code, msg, hdrs): raise urllib.error.HTTPError(req.full_url, code, msg, hdrs, fp)
+    def http_error_302(self, req, fp, code, msg, hdrs): raise urllib.error.HTTPError(req.full_url, code, msg, hdrs, fp)
+    def http_error_303(self, req, fp, code, msg, hdrs): raise urllib.error.HTTPError(req.full_url, code, msg, hdrs, fp)
+    def http_error_307(self, req, fp, code, msg, hdrs): raise urllib.error.HTTPError(req.full_url, code, msg, hdrs, fp)
+
+
+def _github_headers() -> dict:
+    token = os.environ.get("GITHUB_TOKEN")
+    headers = {"Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def check_github_authorization(path: Path, github_repo: str, actor: str) -> None:
+    """Verify actor is the repo owner or a public member of the owning org.
+
+    Exits with an error if authorization cannot be confirmed.
+    Prints a note and returns if the check is inconclusive (API error).
+    """
+    owner = github_repo.split("/")[0]
+
+    # Personal repo: actor must be the owner.
+    if actor == owner:
+        return
+
+    # Org repo: check if actor is a public org member.
+    url = f"https://api.github.com/orgs/{owner}/members/{actor}"
+    req = urllib.request.Request(url, headers=_github_headers())
+    opener = urllib.request.build_opener(_NoRedirect())
+    try:
+        with opener.open(req) as resp:
+            if resp.status == 204:
+                return  # confirmed public org member
+    except urllib.error.HTTPError as e:
+        if e.code in (302, 404):
+            fail(
+                f"{path}: '{actor}' is not authorized to modify this registration.\n"
+                f"  The publish source is '{github_repo}'.\n"
+                f"  The PR author must be '{owner}' or a public member of that org."
+            )
+        # Other HTTP errors (rate limit, server error): inconclusive, skip check.
+        print(f"  note: could not verify GitHub authorization for {github_repo} (HTTP {e.code}), human review required")
+    except Exception as e:
+        print(f"  note: could not verify GitHub authorization for {github_repo} ({e}), human review required")
+
+
+def validate_toml(path: Path, base_ref: str, actor: str | None) -> None:
     try:
         with open(path, "rb") as f:
             data = tomllib.load(f)
@@ -77,6 +147,14 @@ def validate_toml(path: Path, base_ref: str) -> None:
     expected_name = path.stem
     if name != expected_name:
         fail(f"{path}: name '{name}' does not match filename '{expected_name}'")
+
+    existing = base_registration(path, base_ref)
+    if existing is not None:
+        for field in IMMUTABLE_FIELDS:
+            old_val = existing.get(field)
+            new_val = data.get(field)
+            if old_val != new_val:
+                fail(f"{path}: '{field}' is immutable and cannot be changed (was '{old_val}', got '{new_val}')")
 
     owner = data.get("owner", {})
     for field in REQUIRED_OWNER_FIELDS:
@@ -99,11 +177,19 @@ def validate_toml(path: Path, base_ref: str) -> None:
                 f"expected '{existing_owner.get('email')}', got '{new_owner.get('email')}'"
             )
 
+    publish = data.get("publish", {})
+    github_repo = publish.get("github")
+    if github_repo and actor:
+        check_github_authorization(path, github_repo, actor)
+    elif not github_repo:
+        print(f"  note: {path} has no GitHub publish source — human review required for authorization")
+
     print(f"  ok: {path}")
 
 
 def main() -> None:
     base_ref = os.environ.get("BASE_REF", "origin/main")
+    actor = os.environ.get("GITHUB_ACTOR")
 
     changed = changed_files(base_ref)
     non_registry = [f for f in changed if not f.startswith("registry/")]
@@ -115,7 +201,7 @@ def main() -> None:
         fail("no .toml files changed")
 
     for path in toml_files:
-        validate_toml(path, base_ref)
+        validate_toml(path, base_ref, actor)
 
     print(f"OK: {len(toml_files)} registration file(s) validated")
 
