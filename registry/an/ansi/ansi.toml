@@ -1,0 +1,14 @@
+name        = "ansi"
+namespace   = "ansi"
+description = "ANSI terminal escape codes for styled text output"
+url         = "https://github.com/liufengyun/ansi"
+repo        = "https://github.com/liufengyun/ansi"
+registered  = "2026-03-31"
+runtime     = "pure"
+
+[owner]
+name  = "Fengyun Liu"
+email = "fengyun.liu.cs@gmail.com"
+
+[publish]
+github = "liufengyun/ansi"
