@@ -43,15 +43,17 @@ the publication source for the package. This file is human-reviewed and changes
 rarely.
 
 ```toml
-name       = "greeter-pkg"
-namespace  = "greeter.pkg"
-repo       = "github.com/alice/greeter"
-registered = "2026-03-25"
+name        = "greeter-pkg"
+namespace   = "greeter.pkg"
+description = "A friendly greeter library"
+url         = "https://greeter.example.com"
+repo        = "https://github.com/alice/greeter"
+registered  = "2026-03-25"
+runtime     = "pure"
 
 [owner]
 name  = "Alice Smith"
 email = "alice@example.com"
-url   = "https://alice.dev"
 
 [publish]
 github = "alice/greeter"
@@ -59,14 +61,17 @@ github = "alice/greeter"
 
 Fields:
 
-| Field       | Mutable? | Description |
+| Field         | Mutable? | Description |
 |---|---|---|
-| `name`      | No  | Package name (must match filename) |
-| `namespace` | No  | Dot-separated namespace (top-level component determines shard) |
-| `registered`| No  | Registration date — set once at registration |
-| `repo`      | Yes | Source repository link |
-| `[owner]`   | Yes | Primary contact for the package |
-| `[publish]` | Yes | Publication source — currently only `github = "owner/repo"` is supported |
+| `name`        | No  | Package name (must match filename) |
+| `namespace`   | No  | Dot-separated namespace (top-level component determines shard) |
+| `registered`  | No  | Registration date — set once at registration |
+| `runtime`     | No  | Target runtime: `pure` (no FFI), `ruby`, or `python` |
+| `description` | Yes | Short human-readable description of the package |
+| `url`         | Yes | Package homepage or documentation site (must be `https://`) |
+| `repo`        | Yes | Source repository URL (must be `https://`; may differ from `publish.github`) |
+| `[owner]`     | Yes | Primary contact for the package |
+| `[publish]`   | Yes | Publication source — currently only `github = "owner/repo"` is supported |
 
 To register a new package, open a PR adding the `.toml` file. Human review is
 required for registration.
@@ -124,6 +129,7 @@ Required fields:
 | `version` | string | `MAJOR.MINOR.PATCH` or `MAJOR.MINOR.PATCH-modifier` (e.g. `1.2.0-rc1`) |
 | `url`     | string | Download URL of the `.joy` artifact |
 | `sha512`  | string | Hex SHA-512 of the artifact |
+| `runtime` | string | Target runtime, copied from registry: `pure`, `ruby`, or `python` |
 
 Optional fields:
 

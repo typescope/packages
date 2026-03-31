@@ -18,6 +18,7 @@ import subprocess
 import sys
 import tomllib
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -36,9 +37,10 @@ def changed_files(base_ref: str) -> list[str]:
     return [f for f in git("diff", "--name-only", f"{base_ref}...HEAD").splitlines() if f.strip()]
 
 
-REQUIRED_FIELDS = ("name", "namespace", "repo", "registered", "publish")
+REQUIRED_FIELDS = ("name", "namespace", "description", "url", "repo", "registered", "runtime", "publish")
 REQUIRED_OWNER_FIELDS = ("name", "email")
-IMMUTABLE_FIELDS = ("name", "namespace", "registered")
+IMMUTABLE_FIELDS = ("name", "namespace", "registered", "runtime")
+VALID_RUNTIMES = ("pure", "python", "ruby")
 
 
 def namespace_shard(namespace: str) -> str:
@@ -167,6 +169,20 @@ def validate_toml(path: Path, base_ref: str, actor: str | None) -> None:
     expected_name = path.stem
     if name != expected_name:
         fail(f"{path}: name '{name}' does not match filename '{expected_name}'")
+
+    runtime = data["runtime"]
+    if runtime not in VALID_RUNTIMES:
+        fail(f"{path}: invalid runtime '{runtime}'; must be one of {VALID_RUNTIMES}")
+
+    url = data["url"]
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or not parsed.netloc:
+        fail(f"{path}: 'url' must be a valid https:// URL, got '{url}'")
+
+    repo = data["repo"]
+    parsed_repo = urllib.parse.urlparse(repo)
+    if parsed_repo.scheme != "https" or not parsed_repo.netloc:
+        fail(f"{path}: 'repo' must be a valid https:// URL, got '{repo}'")
 
     base = base_registration(path, base_ref)
     if base is not None:

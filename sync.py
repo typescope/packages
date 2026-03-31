@@ -108,8 +108,8 @@ def download_verified(url: str, dest: Path, sha512_url: str) -> str:
 
     return actual
 
-def read_deps_from_artifact(path: Path) -> dict[str, str]:
-    """Extract dependencies from meta.toml inside a .joy archive."""
+def read_meta_from_artifact(path: Path) -> dict:
+    """Extract fields from meta.toml inside a .joy archive. Returns {} on failure."""
     try:
         with zipfile.ZipFile(path) as zf:
             names = zf.namelist()
@@ -120,8 +120,7 @@ def read_deps_from_artifact(path: Path) -> dict[str, str]:
             if meta_name is None:
                 return {}
             with zf.open(meta_name) as f:
-                meta = tomllib.load(f)
-        return meta.get("dependencies", {})
+                return tomllib.load(f)
     except Exception:
         return {}
 
@@ -160,8 +159,8 @@ def append_release(jsonl_path: Path, record: dict) -> None:
 # GitHub Releases source
 # ---------------------------------------------------------------------------
 
-def scan_github(name: str, repo: str, existing: dict[str, dict], jsonl_path: Path,
-                dry_run: bool) -> list[str]:
+def scan_github(name: str, repo: str, declared_runtime: str, existing: dict[str, dict],
+                jsonl_path: Path, dry_run: bool) -> list[str]:
     """Scan GitHub Releases for new versions of package `name` in `repo`.
 
     Version is derived from the .joy asset name (<name>-v<version>.joy);
@@ -243,15 +242,28 @@ def scan_github(name: str, repo: str, existing: dict[str, dict], jsonl_path: Pat
                     errors.append(f"v{version}: {e}")
                     continue
 
+                # Read meta.toml from artifact
+                meta = read_meta_from_artifact(joy_path)
+
+                # Validate runtime matches registry declaration
+                artifact_runtime = meta.get("ffi", "pure")
+                if artifact_runtime != declared_runtime:
+                    errors.append(
+                        f"v{version}: runtime mismatch: registry declares '{declared_runtime}', "
+                        f"artifact meta.toml has ffi='{artifact_runtime}'"
+                    )
+                    continue
+
                 # Build release record
                 record: dict = {
                     "version": version,
                     "url": joy_url,
                     "sha512": joy_sha512,
+                    "runtime": declared_runtime,
                 }
 
                 # Extract deps from artifact
-                deps = read_deps_from_artifact(joy_path)
+                deps = meta.get("dependencies", {})
                 if deps:
                     record["deps"] = deps
 
@@ -294,10 +306,14 @@ def scan_package(toml_path: Path, dry_run: bool) -> list[str]:
 
     name = reg.get("name")
     namespace = reg.get("namespace")
+    runtime = reg.get("runtime")
     publish = reg.get("publish", {})
 
     if not name or not namespace:
         return [f"{toml_path}: missing name or namespace"]
+
+    if not runtime:
+        return [f"{toml_path}: missing runtime field"]
 
     if not publish:
         return [f"{toml_path}: missing [publish] section"]
@@ -307,7 +323,7 @@ def scan_package(toml_path: Path, dry_run: bool) -> list[str]:
     existing = load_release_log(jsonl_path)
 
     if "github" in publish:
-        return scan_github(name, publish["github"], existing, jsonl_path, dry_run)
+        return scan_github(name, publish["github"], runtime, existing, jsonl_path, dry_run)
     else:
         known_keys = list(publish.keys())
         return [f"{toml_path}: unsupported publication source(s): {known_keys}"]

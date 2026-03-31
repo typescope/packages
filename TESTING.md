@@ -49,7 +49,8 @@ These tests exercise `.github/scripts/validate_registration.py`.
 | # | Description | Expected result |
 |---|---|---|
 | R8 | Registration file where `name` does not match filename | CI fails: `name '...' does not match filename '...'` |
-| R9 | Registration file missing a required field (e.g. `repo`) | CI fails: `missing required field '...'` |
+| R9 | Registration file missing a required field (e.g. `repo` or `runtime`) | CI fails: `missing required field '...'` |
+| R9b | Registration file with invalid `runtime` value (e.g. `js`) | CI fails: `invalid runtime '...'; must be one of ('pure', 'python', 'ruby')` |
 | R10 | PR touches files outside `registry/` | CI fails: `registration PR must only touch files under registry/` |
 | R11 | PR changes `name` of an existing registration | CI fails: `'name' is immutable and cannot be changed` |
 | R12 | PR changes `namespace` of an existing registration | CI fails: `'namespace' is immutable and cannot be changed` |

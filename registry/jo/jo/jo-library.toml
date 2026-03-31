@@ -1,12 +1,14 @@
-name       = "jo-library"
-namespace  = "jo"
-repo       = "github.com/typescope/jo"
-registered = "2026-03-26"
+name        = "jo-library"
+namespace   = "jo"
+description = "Core standard library for the Jo language"
+url         = "https://jo-lang.org"
+repo        = "https://github.com/typescope/jo"
+registered  = "2026-03-26"
+runtime     = "pure"
 
 [owner]
 name  = "TypeScope"
 email = "fengyun.liu@typescope.ai"
-url   = "https://typescope.ai"
 
 [publish]
 github = "typescope/jo"

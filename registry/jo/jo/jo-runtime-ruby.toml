@@ -1,12 +1,14 @@
-name       = "jo-runtime-ruby"
-namespace  = "jo"
-repo       = "github.com/typescope/jo"
-registered = "2026-03-26"
+name        = "jo-runtime-ruby"
+namespace   = "jo"
+description = "Ruby runtime bindings for the Jo language"
+url         = "https://jo-lang.org"
+repo        = "https://github.com/typescope/jo"
+registered  = "2026-03-26"
+runtime     = "ruby"
 
 [owner]
 name  = "TypeScope"
 email = "fengyun.liu@typescope.ai"
-url   = "https://typescope.ai"
 
 [publish]
 github = "typescope/jo"

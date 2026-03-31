@@ -1,12 +1,14 @@
-name       = "jo-runtime-python"
-namespace  = "jo"
-repo       = "github.com/typescope/jo"
-registered = "2026-03-26"
+name        = "jo-runtime-python"
+namespace   = "jo"
+description = "Python runtime bindings for the Jo language"
+url         = "https://jo-lang.org"
+repo        = "https://github.com/typescope/jo"
+registered  = "2026-03-26"
+runtime     = "python"
 
 [owner]
 name  = "TypeScope"
 email = "fengyun.liu@typescope.ai"
-url   = "https://typescope.ai"
 
 [publish]
 github = "typescope/jo"
