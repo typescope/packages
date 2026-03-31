@@ -86,11 +86,19 @@ These tests exercise `.github/scripts/validate_release.py`.
 | P4 | Release line has wrong `sha512` | CI fails: `sha512 mismatch` |
 | P5 | Release line has wrong `deps` | CI fails: `deps mismatch` |
 | P6 | Version already present in the release file | CI fails: `version '...' is already present` |
-| P7 | PR adds more than one line | CI fails: `PR must add exactly one line` |
+| P7 | PR adds more than one line | CI fails: `got N removed and M added` |
 | P8 | PR touches more than one release file | CI fails: `release PR must touch exactly one release file` |
 | P9 | Release line is not valid JSON | CI fails: `new release line is not valid JSON` |
 | P10 | Release line missing a required field (`version`, `url`, or `sha512`) | CI fails: `release line missing required field` |
 | P11 | `version` field has invalid format (e.g. `1.2.0-rc-1`, `1.2`, `abc`) | CI fails: `invalid version format '...'` |
+
+### Yank
+
+| # | Description | Expected result |
+|---|---|---|
+| P12 | Valid yank: modify existing line to add `yanked: true` | CI passes |
+| P13 | Yank PR that also changes another field (e.g. `url`) | CI fails: `yank PR must only add 'yanked: true'` |
+| P14 | Yank PR that removes a field instead of adding `yanked: true` | CI fails: `yank PR must only add 'yanked: true'` |
 
 ## Test status
 

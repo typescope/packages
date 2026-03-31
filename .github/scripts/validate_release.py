@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Validate a release PR.
 
-Checks:
+Checks (new release):
   1. PR only touches files under releases/
   2. PR touches exactly one release file
   3. A registration exists for the package
@@ -13,6 +13,11 @@ Checks:
   8. The version is not already present in the release file
   9. The artifact sha512 matches the claimed value
   10. The deps field (if present) matches meta.toml from the artifact
+
+Checks (yank):
+  1-4. Same as above
+  5. PR modifies exactly one existing line (no lines added or deleted)
+  6. The modified line is identical to the original except yanked: true is added
 """
 
 import hashlib
@@ -47,13 +52,16 @@ def changed_files(base_ref: str) -> list[str]:
     return [f for f in git("diff", "--name-only", f"{base_ref}...HEAD").splitlines() if f.strip()]
 
 
-def added_lines(path: str, base_ref: str) -> list[str]:
+def diff_lines(path: str, base_ref: str) -> tuple[list[str], list[str]]:
+    """Return (removed, added) content lines from the diff."""
     diff = git("diff", f"{base_ref}...HEAD", "--", path)
-    return [
-        line[1:].strip()
-        for line in diff.splitlines()
-        if line.startswith("+") and not line.startswith("+++")
-    ]
+    removed, added = [], []
+    for line in diff.splitlines():
+        if line.startswith("-") and not line.startswith("---"):
+            removed.append(line[1:].strip())
+        elif line.startswith("+") and not line.startswith("+++"):
+            added.append(line[1:].strip())
+    return removed, added
 
 
 def base_file_lines(path: str, base_ref: str) -> list[str]:
@@ -170,12 +178,21 @@ def main() -> None:
         fail(f"GITHUB_ACTOR is not set; cannot verify authorization for {registry_path}")
     check_github_authorization(registry_path, github_repo, actor)
 
-    # 4. Check exactly one line added
-    added = added_lines(release_path, base_ref)
-    if len(added) != 1:
-        fail(f"PR must add exactly one line to the release file, found {len(added)}")
-    new_line = added[0]
+    # 4. Detect mode: new release (pure append) or yank (one line modified)
+    removed, added = diff_lines(release_path, base_ref)
 
+    if len(removed) == 0 and len(added) == 1:
+        validate_new_release(release_path, added[0], package_name, base_ref)
+    elif len(removed) == 1 and len(added) == 1:
+        validate_yank(release_path, removed[0], added[0], package_name)
+    else:
+        fail(
+            f"release PR must either append exactly one line (new release) or "
+            f"modify exactly one line (yank); got {len(removed)} removed and {len(added)} added"
+        )
+
+
+def validate_new_release(release_path: str, new_line: str, package_name: str, base_ref: str) -> None:
     # 5. Parse and validate required fields
     try:
         record = json.loads(new_line)
@@ -215,13 +232,37 @@ def main() -> None:
         if actual_sha512 != claimed_sha512:
             fail(f"sha512 mismatch:\n  claimed: {claimed_sha512}\n  actual:  {actual_sha512}")
 
-        # 10. Verify deps if present
+        # 9. Verify deps if present
         if "deps" in record:
             actual_deps = read_deps_from_artifact(artifact_path)
             if record["deps"] != actual_deps:
                 fail(f"deps mismatch:\n  claimed: {record['deps']}\n  actual:  {actual_deps}")
 
-    print(f"OK: {package_name} {version} passed all checks")
+    print(f"OK: {package_name} {version} — new release passed all checks")
+
+
+def validate_yank(release_path: str, old_line: str, new_line: str, package_name: str) -> None:
+    try:
+        old_record = json.loads(old_line)
+    except json.JSONDecodeError as e:
+        fail(f"existing release line is not valid JSON: {e}")
+    try:
+        new_record = json.loads(new_line)
+    except json.JSONDecodeError as e:
+        fail(f"modified release line is not valid JSON: {e}")
+
+    version = old_record.get("version", "<unknown>")
+
+    # The new record must be exactly the old record with yanked: true added.
+    expected = {**old_record, "yanked": True}
+    if new_record != expected:
+        fail(
+            f"yank PR for '{version}' must only add 'yanked: true' to the existing record.\n"
+            f"  expected: {json.dumps(expected, separators=(',', ':'))}\n"
+            f"  got:      {json.dumps(new_record, separators=(',', ':'))}"
+        )
+
+    print(f"OK: {package_name} {version} — yank passed all checks")
 
 
 if __name__ == "__main__":
