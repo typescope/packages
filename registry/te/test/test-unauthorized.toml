@@ -1,0 +1,11 @@
+name       = "test-unauthorized"
+namespace  = "test"
+repo       = "github.com/torvalds/linux"
+registered = "2026-03-31"
+
+[owner]
+name  = "Linus Torvalds"
+email = "torvalds@example.com"
+
+[publish]
+github = "torvalds/linux"
