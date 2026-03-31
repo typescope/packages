@@ -1,0 +1,11 @@
+name       = "test-nonexistent"
+namespace  = "test"
+repo       = "github.com/liufengyun/nonexistent-repo-xyz-12345"
+registered = "2026-03-31"
+
+[owner]
+name  = "Test User"
+email = "test@example.com"
+
+[publish]
+github = "liufengyun/nonexistent-repo-xyz-12345"
