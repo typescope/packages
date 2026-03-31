@@ -125,6 +125,34 @@ def read_meta_from_artifact(path: Path) -> dict:
         return {}
 
 
+def dep_runtime(package_name: str) -> str | None:
+    """Return the runtime declared in the registry for package_name, or None if not found."""
+    matches = list(Path("registry").rglob(f"{package_name}.toml"))
+    if not matches:
+        return None
+    try:
+        with open(matches[0], "rb") as f:
+            reg = tomllib.load(f)
+        return reg.get("runtime")
+    except Exception:
+        return None
+
+
+def check_deps_are_pure(deps: dict) -> list[str]:
+    """Return error strings for any dependency that is not a registered pure package."""
+    errors = []
+    for name in deps:
+        runtime = dep_runtime(name)
+        if runtime is None:
+            errors.append(f"dependency '{name}' is not registered")
+        elif runtime != "pure":
+            errors.append(
+                f"dependency '{name}' has runtime '{runtime}'; "
+                f"published packages may only depend on 'pure' packages"
+            )
+    return errors
+
+
 # ---------------------------------------------------------------------------
 # Release log
 # ---------------------------------------------------------------------------
@@ -262,8 +290,13 @@ def scan_github(name: str, repo: str, declared_runtime: str, existing: dict[str,
                     "runtime": declared_runtime,
                 }
 
-                # Extract deps from artifact
+                # Extract deps from artifact and verify all are pure
                 deps = meta.get("dependencies", {})
+                dep_errors = check_deps_are_pure(deps)
+                if dep_errors:
+                    for e in dep_errors:
+                        errors.append(f"v{version}: {e}")
+                    continue
                 if deps:
                     record["deps"] = deps
 

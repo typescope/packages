@@ -13,6 +13,7 @@ Checks (new release):
   8. The version is not already present in the release file
   9. The artifact sha512 matches the claimed value
   10. The deps field (if present) matches meta.toml from the artifact
+  11. All dependencies are registered as pure packages
 
 Checks (yank):
   1-4. Same as above
@@ -80,6 +81,29 @@ def sha512_hex(path: str) -> str:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def dep_runtime(package_name: str) -> str | None:
+    """Return the runtime declared in the registry for package_name, or None if not found."""
+    matches = list(Path("registry").rglob(f"{package_name}.toml"))
+    if not matches:
+        return None
+    try:
+        with open(matches[0], "rb") as f:
+            reg = tomllib.load(f)
+        return reg.get("runtime")
+    except Exception:
+        return None
+
+
+def check_deps_are_pure(deps: dict) -> None:
+    """Fail if any dependency is not registered as a pure package."""
+    for name in deps:
+        runtime = dep_runtime(name)
+        if runtime is None:
+            fail(f"dependency '{name}' is not registered")
+        if runtime != "pure":
+            fail(f"dependency '{name}' has runtime '{runtime}'; published packages may only depend on 'pure' packages")
 
 
 def read_deps_from_artifact(artifact_path: str) -> dict:
@@ -237,6 +261,9 @@ def validate_new_release(release_path: str, new_line: str, package_name: str, ba
             actual_deps = read_deps_from_artifact(artifact_path)
             if record["deps"] != actual_deps:
                 fail(f"deps mismatch:\n  claimed: {record['deps']}\n  actual:  {actual_deps}")
+
+        # 10. Verify all dependencies are pure packages
+        check_deps_are_pure(record.get("deps", {}))
 
     print(f"OK: {package_name} {version} — new release passed all checks")
 

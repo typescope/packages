@@ -153,6 +153,11 @@ Example:
 - `sha512` must never change for the same version
 - To withdraw a release, set `yanked: true` — never delete or rewrite a line
 
+### Dependency rules
+
+- All entries in `deps` must be registered packages with `runtime = "pure"`
+- This applies regardless of the publishing package's own runtime — a `ruby` runtime package may depend only on `pure` packages
+
 ## Client resolution
 
 The release index is served flat at:
