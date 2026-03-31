@@ -6,7 +6,7 @@ registered = "2026-03-26"
 [owner]
 name  = "TypeScope"
 email = "fengyun.liu@typescope.ai"
-url   = "https://typescope.ai"
+url   = "https://typescope.ai/updated"
 
 [publish]
 github = "typescope/jo"
