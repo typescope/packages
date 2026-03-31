@@ -5,9 +5,8 @@ Checks:
   1. PR only touches files under registry/
   2. Each changed .toml file has all required fields
   3. The name field matches the filename
-  4. publishers is a non-empty list
-  5. If the namespace is already used by another registration, the PR author
-     must be listed as a publisher in one of those existing registrations
+  4. If the namespace is already used by another registration, the new
+     registration's owner.name and owner.email must match the existing owner
 """
 
 import os
@@ -31,7 +30,7 @@ def changed_files(base_ref: str) -> list[str]:
     return [f for f in git("diff", "--name-only", f"{base_ref}...HEAD").splitlines() if f.strip()]
 
 
-REQUIRED_FIELDS = ("name", "namespace", "repo", "registered", "publishers")
+REQUIRED_FIELDS = ("name", "namespace", "repo", "registered")
 REQUIRED_OWNER_FIELDS = ("name", "email")
 
 
@@ -63,7 +62,7 @@ def existing_registrations_for_namespace(namespace: str, base_ref: str) -> list[
     return registrations
 
 
-def validate_toml(path: Path, pr_author: str, base_ref: str) -> None:
+def validate_toml(path: Path, base_ref: str) -> None:
     try:
         with open(path, "rb") as f:
             data = tomllib.load(f)
@@ -79,10 +78,6 @@ def validate_toml(path: Path, pr_author: str, base_ref: str) -> None:
     if name != expected_name:
         fail(f"{path}: name '{name}' does not match filename '{expected_name}'")
 
-    publishers = data["publishers"]
-    if not isinstance(publishers, list) or len(publishers) == 0:
-        fail(f"{path}: publishers must be a non-empty list of GitHub IDs")
-
     owner = data.get("owner", {})
     for field in REQUIRED_OWNER_FIELDS:
         if field not in owner:
@@ -91,13 +86,6 @@ def validate_toml(path: Path, pr_author: str, base_ref: str) -> None:
     namespace = data["namespace"]
     existing = existing_registrations_for_namespace(namespace, base_ref)
     if existing:
-        existing_publishers = {p for reg in existing for p in reg.get("publishers", [])}
-        if pr_author not in existing_publishers:
-            fail(
-                f"{path}: namespace '{namespace}' is already claimed; "
-                f"'{pr_author}' is not in its publishers list"
-            )
-
         existing_owner = existing[0].get("owner", {})
         new_owner = data.get("owner", {})
         if new_owner.get("name") != existing_owner.get("name"):
@@ -115,7 +103,6 @@ def validate_toml(path: Path, pr_author: str, base_ref: str) -> None:
 
 
 def main() -> None:
-    pr_author = os.environ["PR_AUTHOR"]
     base_ref = os.environ.get("BASE_REF", "origin/main")
 
     changed = changed_files(base_ref)
@@ -128,7 +115,7 @@ def main() -> None:
         fail("no .toml files changed")
 
     for path in toml_files:
-        validate_toml(path, pr_author, base_ref)
+        validate_toml(path, base_ref)
 
     print(f"OK: {len(toml_files)} registration file(s) validated")
 

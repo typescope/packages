@@ -82,6 +82,15 @@ greeter-pkg-v1.2.0-sources.zip          (optional)
 greeter-pkg-v1.2.0-sources.zip.sha512   (required if sources archive is present)
 ```
 
+Pre-release versions follow the same convention with a modifier suffix:
+
+```
+greeter-pkg-v1.2.0-rc1.joy
+greeter-pkg-v1.2.0-rc1.joy.sha512
+```
+
+The modifier must be alphanumeric with no dashes (e.g. `rc1`, `beta2`, `alpha1`).
+
 The registry daemon (`sync.py`) periodically scans registered packages,
 discovers new artifacts by name, verifies each artifact against its `.sha512`
 file, and appends a canonical entry to the release log. No PR or manual action
@@ -99,7 +108,7 @@ Required fields:
 
 | Field     | Type   | Description |
 |---|---|---|
-| `version` | string | `MAJOR.MINOR.PATCH` |
+| `version` | string | `MAJOR.MINOR.PATCH` or `MAJOR.MINOR.PATCH-modifier` (e.g. `1.2.0-rc1`) |
 | `url`     | string | Download URL of the `.joy` artifact |
 | `sha512`  | string | Hex SHA-512 of the artifact |
 

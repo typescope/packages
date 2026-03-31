@@ -21,6 +21,7 @@ Exit code:
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 import tomli as tomllib
@@ -28,6 +29,10 @@ import urllib.request
 import urllib.error
 import zipfile
 from pathlib import Path
+
+
+# Matches MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier (alphanumeric modifier, no dashes).
+VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9]+)?$")
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +200,11 @@ def scan_github(name: str, repo: str, existing: dict[str, dict], jsonl_path: Pat
         for joy_asset in joy_assets:
             joy_name = joy_asset["name"]
             version = joy_name[len(joy_prefix):-len(joy_suffix)]
+
+            # Reject malformed version strings
+            if not VERSION_RE.match(version):
+                errors.append(f"v{version}: asset '{joy_name}' has invalid version format, skipping")
+                continue
 
             # Skip already-recorded versions
             if version in existing:

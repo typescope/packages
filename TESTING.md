@@ -78,6 +78,7 @@ These tests exercise `.github/scripts/validate_release.py`.
 | P8 | PR touches more than one release file | CI fails: `release PR must touch exactly one release file` |
 | P9 | Release line is not valid JSON | CI fails: `new release line is not valid JSON` |
 | P10 | Release line missing a required field (`version`, `url`, or `sha512`) | CI fails: `release line missing required field` |
+| P11 | `version` field has invalid format (e.g. `1.2.0-rc-1`, `1.2`, `abc`) | CI fails: `invalid version format '...'` |
 
 ## Test status
 

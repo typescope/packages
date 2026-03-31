@@ -2,18 +2,21 @@
 """Validate a release PR.
 
 Checks:
-  1. PR touches exactly one file under releases/
-  2. PR author is in the publishers list for that package
-  3. PR appends exactly one line to the release file
-  4. The appended line is valid JSON with all required fields
-  5. The version is not already present in the release file
-  6. The artifact sha512 matches the claimed value
-  7. The deps field (if present) matches meta.toml from the artifact
+  1. PR only touches files under releases/
+  2. PR touches exactly one release file
+  3. A registration exists for the package
+  4. PR appends exactly one line to the release file
+  5. The appended line is valid JSON with all required fields
+  6. The version format is valid (MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier)
+  7. The version is not already present in the release file
+  8. The artifact sha512 matches the claimed value
+  9. The deps field (if present) matches meta.toml from the artifact
 """
 
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -21,6 +24,10 @@ import tomllib
 import urllib.request
 import zipfile
 from pathlib import Path
+
+
+# Matches MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier (alphanumeric modifier, no dashes).
+VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9]+)?$")
 
 
 def fail(msg: str) -> None:
@@ -78,7 +85,6 @@ def read_deps_from_artifact(artifact_path: str) -> dict:
 
 
 def main() -> None:
-    pr_author = os.environ["PR_AUTHOR"]
     base_ref = os.environ.get("BASE_REF", "origin/main")
 
     # 1. Check changed files
@@ -98,15 +104,10 @@ def main() -> None:
     _, shard, namespace, filename = parts
     package_name = filename.removesuffix(".jsonl")
 
-    # 2. Check publisher authorization
+    # 2. Check registration exists
     registry_path = Path("registry") / shard / namespace / f"{package_name}.toml"
     if not registry_path.exists():
         fail(f"no registration metadata found at {registry_path}")
-    with open(registry_path, "rb") as f:
-        registration = tomllib.load(f)
-    publishers = registration.get("publishers", [])
-    if pr_author not in publishers:
-        fail(f"'{pr_author}' is not authorized to publish '{package_name}' (publishers: {publishers})")
 
     # 3. Check exactly one line added
     added = added_lines(release_path, base_ref)
@@ -127,7 +128,11 @@ def main() -> None:
     url = record["url"]
     claimed_sha512 = record["sha512"]
 
-    # 5. Check version not already present
+    # 5. Validate version format
+    if not VERSION_RE.match(version):
+        fail(f"invalid version format '{version}': must be MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier")
+
+    # 6. Check version not already present
     for line in base_file_lines(release_path, base_ref):
         line = line.strip()
         if not line:
@@ -139,7 +144,7 @@ def main() -> None:
         if existing.get("version") == version:
             fail(f"version '{version}' is already present in {release_path}")
 
-    # 6. Download artifact and verify sha512
+    # 7. Download artifact and verify sha512
     with tempfile.TemporaryDirectory() as tmpdir:
         artifact_path = os.path.join(tmpdir, f"{package_name}-v{version}.joy")
         print(f"Downloading {url} ...")
@@ -149,7 +154,7 @@ def main() -> None:
         if actual_sha512 != claimed_sha512:
             fail(f"sha512 mismatch:\n  claimed: {claimed_sha512}\n  actual:  {actual_sha512}")
 
-        # 7. Verify deps if present
+        # 9. Verify deps if present
         if "deps" in record:
             actual_deps = read_deps_from_artifact(artifact_path)
             if record["deps"] != actual_deps:
