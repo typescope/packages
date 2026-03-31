@@ -40,9 +40,9 @@ These tests exercise `.github/scripts/validate_registration.py`.
 
 | # | Description | Expected result |
 |---|---|---|
-| R5 | PR author is not the owner of `publish.github` repo (personal repo) | CI fails: `'<author>' is not authorized to modify this registration` |
-| R6 | PR author is not a public member of the owning org (org repo) | CI fails: `'<author>' is not authorized to modify this registration` |
-| R7 | Registration has no `publish.github` source | CI passes with note: `human review required for authorization` |
+| R5 | New registration with `publish.github` pointing to a non-existent repo | CI fails: `GitHub repository '...' does not exist or is not accessible` |
+| R6 | PR author is not the owner of `publish.github` repo (personal repo) | CI fails: `'<author>' is not authorized to modify this registration` |
+| R7 | PR author is not a public member of the owning org (org repo) | CI fails: `'<author>' is not authorized to modify this registration` |
 
 ### Structural checks
 
@@ -54,6 +54,9 @@ These tests exercise `.github/scripts/validate_registration.py`.
 | R11 | PR changes `name` of an existing registration | CI fails: `'name' is immutable and cannot be changed` |
 | R12 | PR changes `namespace` of an existing registration | CI fails: `'namespace' is immutable and cannot be changed` |
 | R13 | PR changes `registered` of an existing registration | CI fails: `'registered' is immutable and cannot be changed` |
+| R14 | Registration missing `[publish]` section | CI fails: `missing required field 'publish'` |
+| R15 | Registration has `[publish]` but no `github` key | CI fails: `[publish] must have a 'github' key` |
+| R16 | Registration has unsupported publish source (e.g. `gitlab`) | CI fails: `unsupported publish source(s)` |
 
 ## Manual release update (`validate-release.yml`)
 
@@ -97,9 +100,9 @@ These tests exercise `.github/scripts/validate_release.py`.
 | R2 | PASS (CI accepted) | main — `jo-runtime-ruby` follows `jo-library` under `jo` namespace |
 | R3 | PASS (CI rejected) | #3 — wrong `owner.name` |
 | R4 | PASS (CI rejected) | #4 — wrong `owner.email` |
-| R5 | — | Requires a second GitHub account; not yet tested |
-| R6 | — | Requires an org repo setup; not yet tested |
-| R7 | — | Not yet tested |
+| R5 | — | Not yet tested |
+| R6 | — | Requires a second GitHub account; not yet tested |
+| R7 | — | Requires an org repo setup; not yet tested |
 | R8 | PASS (CI rejected) | #5 — name `wrong-name` did not match filename `test-pkg` |
 | R9 | PASS (CI rejected) | #6 — missing required field `repo` |
 | R10 | PASS (CI rejected) | #7 — PR touched `stray-file.txt` outside `registry/` |

@@ -8,9 +8,9 @@ Checks:
   4. If the namespace is already used by another registration, the new
      registration's owner.name and owner.email must match the existing owner
   5. Immutable fields (name, namespace, registered) are not changed in updates
-  6. If publish.github is set and GITHUB_ACTOR is known, the actor must be
-     the repo owner or a public member of the repo's owning org.
-     Registrations without a GitHub publish source require human review.
+  6. [publish] section is present and uses github as its source
+  7. GITHUB_ACTOR must be known, and the actor must be the repo owner or a public
+     member of the repo's owning org
 """
 
 import os
@@ -36,7 +36,7 @@ def changed_files(base_ref: str) -> list[str]:
     return [f for f in git("diff", "--name-only", f"{base_ref}...HEAD").splitlines() if f.strip()]
 
 
-REQUIRED_FIELDS = ("name", "namespace", "repo", "registered")
+REQUIRED_FIELDS = ("name", "namespace", "repo", "registered", "publish")
 REQUIRED_OWNER_FIELDS = ("name", "email")
 IMMUTABLE_FIELDS = ("name", "namespace", "registered")
 
@@ -99,8 +99,28 @@ def _github_headers() -> dict:
     return headers
 
 
+def check_repo_exists(path: Path, github_repo: str) -> None:
+    """Verify the GitHub repo exists and is accessible.
+
+    Exits with an error if the repo does not exist.
+    Prints a note and returns if the check is inconclusive (API error).
+    """
+    url = f"https://api.github.com/repos/{github_repo}"
+    req = urllib.request.Request(url, headers=_github_headers())
+    try:
+        with urllib.request.urlopen(req) as resp:
+            if resp.status == 200:
+                return  # repo exists
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            fail(f"{path}: GitHub repository '{github_repo}' does not exist or is not accessible")
+        print(f"  note: could not verify repo existence for {github_repo} (HTTP {e.code}), human review required")
+    except Exception as e:
+        print(f"  note: could not verify repo existence for {github_repo} ({e}), human review required")
+
+
 def check_github_authorization(path: Path, github_repo: str, actor: str) -> None:
-    """Verify actor is the repo owner or a public member of the owning org.
+    """Verify actor is the repo owner or a public member of the repo's owning org.
 
     Exits with an error if authorization cannot be confirmed.
     Prints a note and returns if the check is inconclusive (API error).
@@ -148,10 +168,10 @@ def validate_toml(path: Path, base_ref: str, actor: str | None) -> None:
     if name != expected_name:
         fail(f"{path}: name '{name}' does not match filename '{expected_name}'")
 
-    existing = base_registration(path, base_ref)
-    if existing is not None:
+    base = base_registration(path, base_ref)
+    if base is not None:
         for field in IMMUTABLE_FIELDS:
-            old_val = existing.get(field)
+            old_val = base.get(field)
             new_val = data.get(field)
             if old_val != new_val:
                 fail(f"{path}: '{field}' is immutable and cannot be changed (was '{old_val}', got '{new_val}')")
@@ -178,11 +198,23 @@ def validate_toml(path: Path, base_ref: str, actor: str | None) -> None:
             )
 
     publish = data.get("publish", {})
-    github_repo = publish.get("github")
-    if github_repo and actor:
-        check_github_authorization(path, github_repo, actor)
-    elif not github_repo:
-        print(f"  note: {path} has no GitHub publish source — human review required for authorization")
+    if "github" not in publish:
+        fail(f"{path}: [publish] must have a 'github' key (only GitHub is supported as a publish source)")
+    unsupported = [k for k in publish if k != "github"]
+    if unsupported:
+        fail(f"{path}: unsupported publish source(s): {unsupported} (only 'github' is supported)")
+
+    # For authorization, always use the base-branch publish.github so an attacker
+    # cannot change publish.github to a repo they own and pass the check.
+    github_repo = base.get("publish", {}).get("github") if base is not None else publish["github"]
+
+    # For new registrations, verify the declared repo actually exists.
+    if base is None:
+        check_repo_exists(path, github_repo)
+
+    if not actor:
+        fail(f"{path}: GITHUB_ACTOR is not set; cannot verify authorization")
+    check_github_authorization(path, github_repo, actor)
 
     print(f"  ok: {path}")
 

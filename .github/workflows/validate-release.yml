@@ -18,7 +18,9 @@ jobs:
       - name: Validate release PR
         env:
           BASE_REF: origin/main
-        run: python3 .github/scripts/validate_release.py
+        run: |
+          git show origin/main:.github/scripts/validate_release.py > /tmp/validate_release.py
+          python3 /tmp/validate_release.py
 
   merge:
     needs: validate

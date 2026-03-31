@@ -18,4 +18,6 @@ jobs:
       - name: Validate registration metadata
         env:
           BASE_REF: origin/main
-        run: python3 .github/scripts/validate_registration.py
+        run: |
+          git show origin/main:.github/scripts/validate_registration.py > /tmp/validate_registration.py
+          python3 /tmp/validate_registration.py

@@ -66,7 +66,7 @@ Fields:
 | `registered`| No  | Registration date — set once at registration |
 | `repo`      | Yes | Source repository link |
 | `[owner]`   | Yes | Primary contact for the package |
-| `[publish]` | Yes | Publication source — key identifies the source type |
+| `[publish]` | Yes | Publication source — currently only `github = "owner/repo"` is supported |
 
 To register a new package, open a PR adding the `.toml` file. Human review is
 required for registration.

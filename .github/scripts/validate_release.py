@@ -5,8 +5,8 @@ Checks:
   1. PR only touches files under releases/
   2. PR touches exactly one release file
   3. A registration exists for the package
-  4. If publish.github is set and GITHUB_ACTOR is known, the actor must be
-     the repo owner or a public member of the repo's owning org
+  4. GITHUB_ACTOR must be known, and the actor must be the repo owner or a public
+     member of the repo's owning org
   5. PR appends exactly one line to the release file
   6. The appended line is valid JSON with all required fields
   7. The version format is valid (MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier)
@@ -162,9 +162,13 @@ def main() -> None:
     except Exception as e:
         fail(f"failed to parse {registry_path}: {e}")
 
-    github_repo = reg.get("publish", {}).get("github")
-    if github_repo and actor:
-        check_github_authorization(registry_path, github_repo, actor)
+    publish = reg.get("publish", {})
+    if "github" not in publish:
+        fail(f"registration {registry_path} has no 'github' publish source (only GitHub is supported)")
+    github_repo = publish["github"]
+    if not actor:
+        fail(f"GITHUB_ACTOR is not set; cannot verify authorization for {registry_path}")
+    check_github_authorization(registry_path, github_repo, actor)
 
     # 4. Check exactly one line added
     added = added_lines(release_path, base_ref)
