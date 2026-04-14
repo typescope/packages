@@ -1,0 +1,38 @@
+#!/usr/bin/env python3
+"""Validate that all .jsonl files under releases/ contain well-formed JSON lines.
+
+Usage:
+    bin/validate_releases
+
+Exit code:
+  0  all files are valid
+  1  one or more malformed lines found
+"""
+
+import json
+import sys
+from pathlib import Path
+
+
+def main() -> None:
+    errors = []
+    for path in sorted(Path("releases").rglob("*.jsonl")):
+        for i, line in enumerate(path.read_text().splitlines(), 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                json.loads(line)
+            except json.JSONDecodeError as e:
+                errors.append(f"{path}:{i}: {e}")
+
+    if errors:
+        for err in errors:
+            print(f"ERROR: {err}", file=sys.stderr)
+        sys.exit(1)
+
+    print("OK: all release files are valid JSON")
+
+
+if __name__ == "__main__":
+    main()

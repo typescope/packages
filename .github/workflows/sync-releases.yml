@@ -1,0 +1,49 @@
+name: Sync Releases
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # every hour
+  workflow_dispatch:      # allow manual trigger
+
+# Prevent overlapping runs. If a run is in progress and a new one is triggered,
+# the new run will wait rather than cancel the in-progress one, so no sync is lost.
+concurrency:
+  group: sync-releases
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install dependencies
+        run: pip install tomli
+
+      - name: Sync releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p logs
+          python sync.py 2>>logs/sync-errors.log; true
+          # Keep only the last 10000 lines to prevent unbounded growth
+          tail -n 10000 logs/sync-errors.log > logs/sync-errors.log.tmp
+          mv logs/sync-errors.log.tmp logs/sync-errors.log
+
+      - name: Commit and push new releases
+        run: |
+          git config user.name "sync-bot"
+          git config user.email "bot@jo-lang.org"
+          git add releases/ logs/sync-errors.log
+          # Exit cleanly if nothing changed
+          git diff --cached --quiet && echo "Nothing to commit." && exit 0
+          python3 bin/validate_releases
+          git commit -m "chore: sync releases [skip ci]"
+          # If push fails (e.g. a concurrent manual commit landed), the next
+          # scheduled run will pick up any missed releases automatically.
+          git push origin main

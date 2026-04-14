@@ -34,6 +34,11 @@ from pathlib import Path
 # Matches MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier (alphanumeric modifier, no dashes).
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9]+)?$")
 
+# Registry subtrees to skip during sync (not yet public).
+IGNORE_PREFIXES: list[str] = [
+    "registry/jo/jo/",
+]
+
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -373,7 +378,11 @@ def main() -> None:
         print("=== dry run — no files will be written ===\n")
 
     toml_files = sorted(Path("registry").rglob("*.toml"))
-    toml_files = [p for p in toml_files if p.name != ".gitkeep"]
+    toml_files = [
+        p for p in toml_files
+        if p.name != ".gitkeep"
+        and not any(str(p).startswith(prefix) for prefix in IGNORE_PREFIXES)
+    ]
 
     if not toml_files:
         print("no registered packages found under registry/")
