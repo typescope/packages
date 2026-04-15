@@ -38,6 +38,9 @@ from pathlib import Path
 # Matches MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier (alphanumeric modifier, no dashes).
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9]+)?$")
 
+# Matches the minimum-version constraint used in deps: MAJOR.MINOR (e.g. "1.2").
+DEP_VERSION_RE = re.compile(r"^\d+\.\d+$")
+
 
 def fail(msg: str) -> None:
     print(f"ERROR: {msg}", file=sys.stderr)
@@ -97,8 +100,13 @@ def dep_runtime(package_name: str) -> str | None:
 
 
 def check_deps_are_pure(deps: dict) -> None:
-    """Fail if any dependency is not registered as a pure package."""
-    for name in deps:
+    """Fail if any dependency has an invalid version constraint or is not a registered pure package."""
+    for name, constraint in deps.items():
+        if not DEP_VERSION_RE.match(str(constraint)):
+            fail(
+                f"dependency '{name}' has invalid version constraint '{constraint}'; "
+                f"must be MAJOR.MINOR (e.g. '1.2')"
+            )
         runtime = dep_runtime(name)
         if runtime is None:
             fail(f"dependency '{name}' is not registered")
@@ -222,17 +230,22 @@ def validate_new_release(release_path: str, new_line: str, package_name: str, ba
         record = json.loads(new_line)
     except json.JSONDecodeError as e:
         fail(f"new release line is not valid JSON: {e}")
-    for field in ("version", "url", "sha512"):
+    for field in ("version", "url", "sha512", "jo"):
         if field not in record:
             fail(f"release line missing required field '{field}'")
 
     version = record["version"]
     url = record["url"]
     claimed_sha512 = record["sha512"]
+    jo_version = record["jo"]
 
     # 6. Validate version format
     if not VERSION_RE.match(version):
         fail(f"invalid version format '{version}': must be MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier")
+
+    # 6a. Validate jo version constraint
+    if not DEP_VERSION_RE.match(str(jo_version)):
+        fail(f"invalid 'jo' version '{jo_version}': must be MAJOR.MINOR (e.g. '1.0')")
 
     # 7. Check version not already present
     for line in base_file_lines(release_path, base_ref):

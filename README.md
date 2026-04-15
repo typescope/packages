@@ -130,12 +130,13 @@ Required fields:
 | `url`     | string | Download URL of the `.joy` artifact |
 | `sha512`  | string | Hex SHA-512 of the artifact |
 | `runtime` | string | Target runtime, copied from registry: `pure`, `ruby`, or `python` |
+| `jo`      | string | Minimum Jo version required: `MAJOR.MINOR` (e.g. `1.0`) |
 
 Optional fields:
 
 | Field           | Type    | Description |
 |---|---|---|
-| `deps`          | object  | Direct dependencies: map of package name to version constraint |
+| `deps`          | object  | Direct dependencies: map of package name to minimum version (`MAJOR.MINOR`) |
 | `source_url`    | string  | Download URL of the source archive |
 | `source_sha512` | string  | Hex SHA-512 of the source archive |
 | `yanked`        | boolean | If true, this version is withdrawn and must not be selected for new resolutions |
@@ -143,8 +144,8 @@ Optional fields:
 Example:
 
 ```jsonl
-{"version":"1.0.0","url":"https://github.com/alice/greeter/releases/download/v1.0.0/greeter-pkg-v1.0.0.joy","sha512":"6f0d...","deps":{},"source_url":"...","source_sha512":"91bc..."}
-{"version":"1.1.0","url":"https://github.com/alice/greeter/releases/download/v1.1.0/greeter-pkg-v1.1.0.joy","sha512":"7a21...","deps":{"math":"^1.0"},"source_url":"...","source_sha512":"af44..."}
+{"version":"1.0.0","url":"https://github.com/alice/greeter/releases/download/v1.0.0/greeter-pkg-v1.0.0.joy","sha512":"6f0d...","runtime":"pure","jo":"1.0","source_url":"...","source_sha512":"91bc..."}
+{"version":"1.1.0","url":"https://github.com/alice/greeter/releases/download/v1.1.0/greeter-pkg-v1.1.0.joy","sha512":"7a21...","runtime":"pure","jo":"1.0","deps":{"math":"1.0"},"source_url":"...","source_sha512":"af44..."}
 ```
 
 ### Immutability rules

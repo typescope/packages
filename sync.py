@@ -34,6 +34,9 @@ from pathlib import Path
 # Matches MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier (alphanumeric modifier, no dashes).
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9]+)?$")
 
+# Matches the minimum-version constraint used in deps: MAJOR.MINOR (e.g. "1.2").
+DEP_VERSION_RE = re.compile(r"^\d+\.\d+$")
+
 # Registry subtrees to skip during sync (not yet public).
 IGNORE_PREFIXES: list[str] = [
     "registry/jo/jo/",
@@ -144,9 +147,15 @@ def dep_runtime(package_name: str) -> str | None:
 
 
 def check_deps_are_pure(deps: dict) -> list[str]:
-    """Return error strings for any dependency that is not a registered pure package."""
+    """Return error strings for any dependency that is not a registered pure package,
+    or whose version constraint is not a valid MAJOR.MINOR string."""
     errors = []
-    for name in deps:
+    for name, constraint in deps.items():
+        if not DEP_VERSION_RE.match(str(constraint)):
+            errors.append(
+                f"dependency '{name}' has invalid version constraint '{constraint}'; "
+                f"must be MAJOR.MINOR (e.g. '1.2')"
+            )
         runtime = dep_runtime(name)
         if runtime is None:
             errors.append(f"dependency '{name}' is not registered")
@@ -287,12 +296,25 @@ def scan_github(name: str, repo: str, declared_runtime: str, existing: dict[str,
                     )
                     continue
 
+                # Validate jo version constraint
+                jo_version = meta.get("jo")
+                if not jo_version:
+                    errors.append(f"v{version}: missing 'jo' field in meta.toml")
+                    continue
+                if not DEP_VERSION_RE.match(str(jo_version)):
+                    errors.append(
+                        f"v{version}: invalid 'jo' version '{jo_version}' in meta.toml; "
+                        f"must be MAJOR.MINOR (e.g. '1.0')"
+                    )
+                    continue
+
                 # Build release record
                 record: dict = {
                     "version": version,
                     "url": joy_url,
                     "sha512": joy_sha512,
                     "runtime": declared_runtime,
+                    "jo": jo_version,
                 }
 
                 # Extract deps from artifact and verify all are pure

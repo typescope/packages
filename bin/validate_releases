@@ -1,37 +1,97 @@
 #!/usr/bin/env python3
-"""Validate that all .jsonl files under releases/ contain well-formed JSON lines.
+"""Validate that all .jsonl files under releases/ contain well-formed release records.
+
+Checks per line:
+  1. Valid JSON
+  2. All required fields present: version, url, sha512, runtime, jo
+  3. version format: MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier
+  4. jo format: MAJOR.MINOR
+  5. runtime is one of: pure, ruby, python
+  6. deps values (if present) are MAJOR.MINOR
+  7. yanked (if present) is a boolean
 
 Usage:
     bin/validate_releases
 
 Exit code:
   0  all files are valid
-  1  one or more malformed lines found
+  1  one or more invalid records found
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
 
-def main() -> None:
+VERSION_RE = re.compile(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9]+)?$")
+DEP_VERSION_RE = re.compile(r"^\d+\.\d+$")
+VALID_RUNTIMES = {"pure", "ruby", "python"}
+REQUIRED_FIELDS = ("version", "url", "sha512", "runtime", "jo")
+
+
+def validate_record(rec: dict) -> list[str]:
     errors = []
+
+    for field in REQUIRED_FIELDS:
+        if field not in rec:
+            errors.append(f"missing required field '{field}'")
+
+    if errors:
+        return errors  # no point checking formats if fields are absent
+
+    if not VERSION_RE.match(rec["version"]):
+        errors.append(
+            f"invalid version '{rec['version']}': must be MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier"
+        )
+
+    if not DEP_VERSION_RE.match(str(rec["jo"])):
+        errors.append(
+            f"invalid jo '{rec['jo']}': must be MAJOR.MINOR (e.g. '1.0')"
+        )
+
+    if rec["runtime"] not in VALID_RUNTIMES:
+        errors.append(
+            f"invalid runtime '{rec['runtime']}': must be one of {sorted(VALID_RUNTIMES)}"
+        )
+
+    if "deps" in rec:
+        if not isinstance(rec["deps"], dict):
+            errors.append("'deps' must be an object")
+        else:
+            for name, constraint in rec["deps"].items():
+                if not DEP_VERSION_RE.match(str(constraint)):
+                    errors.append(
+                        f"dep '{name}' has invalid version '{constraint}': must be MAJOR.MINOR"
+                    )
+
+    if "yanked" in rec and not isinstance(rec["yanked"], bool):
+        errors.append(f"'yanked' must be a boolean, got {type(rec['yanked']).__name__}")
+
+    return errors
+
+
+def main() -> None:
+    all_errors = []
     for path in sorted(Path("releases").rglob("*.jsonl")):
         for i, line in enumerate(path.read_text().splitlines(), 1):
             line = line.strip()
             if not line:
                 continue
             try:
-                json.loads(line)
+                rec = json.loads(line)
             except json.JSONDecodeError as e:
-                errors.append(f"{path}:{i}: {e}")
+                all_errors.append(f"{path}:{i}: invalid JSON: {e}")
+                continue
+            for err in validate_record(rec):
+                all_errors.append(f"{path}:{i}: {err}")
 
-    if errors:
-        for err in errors:
+    if all_errors:
+        for err in all_errors:
             print(f"ERROR: {err}", file=sys.stderr)
         sys.exit(1)
 
-    print("OK: all release files are valid JSON")
+    print("OK: all release files are valid")
 
 
 if __name__ == "__main__":
