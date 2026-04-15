@@ -214,7 +214,7 @@ def main() -> None:
     removed, added = diff_lines(release_path, base_ref)
 
     if len(removed) == 0 and len(added) == 1:
-        validate_new_release(release_path, added[0], package_name, base_ref)
+        validate_new_release(release_path, added[0], package_name, base_ref, reg["runtime"])
     elif len(removed) == 1 and len(added) == 1:
         validate_yank(release_path, removed[0], added[0], package_name)
     else:
@@ -224,26 +224,34 @@ def main() -> None:
         )
 
 
-def validate_new_release(release_path: str, new_line: str, package_name: str, base_ref: str) -> None:
+def validate_new_release(release_path: str, new_line: str, package_name: str, base_ref: str, declared_runtime: str) -> None:
     # 5. Parse and validate required fields
     try:
         record = json.loads(new_line)
     except json.JSONDecodeError as e:
         fail(f"new release line is not valid JSON: {e}")
-    for field in ("version", "url", "sha512", "jo"):
+    for field in ("version", "url", "sha512", "runtime", "jo"):
         if field not in record:
             fail(f"release line missing required field '{field}'")
 
     version = record["version"]
     url = record["url"]
     claimed_sha512 = record["sha512"]
+    runtime = record["runtime"]
     jo_version = record["jo"]
 
     # 6. Validate version format
     if not VERSION_RE.match(version):
         fail(f"invalid version format '{version}': must be MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-modifier")
 
-    # 6a. Validate jo version constraint
+    # 6a. Validate runtime matches registry declaration
+    valid_runtimes = {"pure", "ruby", "python"}
+    if runtime not in valid_runtimes:
+        fail(f"invalid runtime '{runtime}': must be one of {sorted(valid_runtimes)}")
+    if runtime != declared_runtime:
+        fail(f"runtime '{runtime}' does not match registry declaration '{declared_runtime}'")
+
+    # 6b. Validate jo version constraint
     if not DEP_VERSION_RE.match(str(jo_version)):
         fail(f"invalid 'jo' version '{jo_version}': must be MAJOR.MINOR (e.g. '1.0')")
 
