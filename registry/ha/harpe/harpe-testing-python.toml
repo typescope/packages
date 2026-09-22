@@ -1,4 +1,4 @@
-name        = "harpe-testing"
+name        = "harpe-testing-python"
 namespace   = "harpe"
 description = "Standalone Jo test framework with assertions, suites, and a test runner"
 url         = "https://harpe.typescope.ai"
