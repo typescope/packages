@@ -1,0 +1,14 @@
+name        = "harpe"
+namespace   = "harpe"
+description = "Agent framework with compile-time sandboxing through typed capabilities"
+url         = "https://harpe.typescope.ai"
+repo        = "https://github.com/typescope/harpe"
+registered  = "2026-09-22"
+runtime     = "python"
+
+[owner]
+name  = "TypeScope"
+email = "fengyun.liu@typescope.ai"
+
+[publish]
+github = "typescope/harpe"
