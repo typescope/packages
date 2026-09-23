@@ -1,0 +1,14 @@
+name        = "harpe-caps"
+namespace   = "harpe"
+description = "Pure capability interfaces for Harpe's sandboxed agent programs"
+url         = "https://harpe.typescope.ai"
+repo        = "https://github.com/typescope/harpe"
+registered  = "2026-09-22"
+runtime     = "pure"
+
+[owner]
+name  = "TypeScope"
+email = "fengyun.liu@typescope.ai"
+
+[publish]
+github = "typescope/harpe"

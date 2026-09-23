@@ -1,0 +1,14 @@
+name        = "harpe-testing-python"
+namespace   = "harpe"
+description = "Standalone Jo test framework with assertions, suites, and a test runner"
+url         = "https://harpe.typescope.ai"
+repo        = "https://github.com/typescope/harpe"
+registered  = "2026-09-22"
+runtime     = "python"
+
+[owner]
+name  = "TypeScope"
+email = "fengyun.liu@typescope.ai"
+
+[publish]
+github = "typescope/harpe"
