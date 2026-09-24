@@ -43,7 +43,7 @@ jobs:
           # Exit cleanly if nothing changed
           git diff --cached --quiet && echo "Nothing to commit." && exit 0
           python3 bin/validate_releases
-          git commit -m "chore: sync releases [skip ci]"
+          git commit -m "chore: sync releases"
           # If push fails (e.g. a concurrent manual commit landed), the next
           # scheduled run will pick up any missed releases automatically.
           git push origin main
