@@ -288,11 +288,11 @@ def scan_github(name: str, repo: str, declared_runtime: str, existing: dict[str,
                 meta = read_meta_from_artifact(joy_path)
 
                 # Validate runtime matches registry declaration
-                artifact_runtime = meta.get("ffi", "pure")
+                artifact_runtime = meta.get("runtime", meta.get("ffi", "pure"))
                 if artifact_runtime != declared_runtime:
                     errors.append(
                         f"v{version}: runtime mismatch: registry declares '{declared_runtime}', "
-                        f"artifact meta.toml has ffi='{artifact_runtime}'"
+                        f"artifact meta.toml has runtime='{artifact_runtime}'"
                     )
                     continue
 
