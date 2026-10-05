@@ -1,0 +1,14 @@
+name = "jtest"
+namespace = "jtest"
+description = "Shared test declarations, assertions, and results for Jo"
+url = "https://github.com/typescope/jtest"
+repo = "https://github.com/typescope/jtest"
+registered = "2026-10-05"
+runtime = "pure"
+
+[owner]
+name = "TypeScope"
+email = "fengyun.liu@typescope.ai"
+
+[publish]
+github = "typescope/jtest"
