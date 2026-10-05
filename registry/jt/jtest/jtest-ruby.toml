@@ -1,0 +1,14 @@
+name = "jtest-ruby"
+namespace = "jtest"
+description = "Ruby test runner implementing jtest.Runner"
+url = "https://github.com/typescope/jtest"
+repo = "https://github.com/typescope/jtest"
+registered = "2026-10-05"
+runtime = "ruby"
+
+[owner]
+name = "TypeScope"
+email = "fengyun.liu@typescope.ai"
+
+[publish]
+github = "typescope/jtest"
